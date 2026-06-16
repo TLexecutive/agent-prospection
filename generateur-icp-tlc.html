@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Générateur ICP — TL Consulting</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0B1A1C;--s1:#132226;--s2:#1A2F34;--s3:#1F3A40;
+  --teal:#2A9D8F;--tl:#3AAFA9;--txl:rgba(42,157,143,0.12);--tb:rgba(42,157,143,0.22);
+  --amber:#F4A261;--green:#2ECC71;--red:#E74C3C;--purple:#9B59B6;
+  --txt:#F0EDE8;--muted:#8A9BA0;--border:rgba(42,157,143,0.16);
+}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+
+/* HEADER */
+.hdr{padding:16px 28px;background:var(--s1);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.hdr-left{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:var(--bg)}
+.title{font-size:17px;font-weight:700;color:var(--teal)}
+.sub{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:1px}
+.hdr-badge{background:rgba(244,162,97,0.12);border:1px solid rgba(244,162,97,0.3);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;color:var(--amber)}
+
+/* MAIN */
+.main{max-width:1100px;margin:0 auto;padding:28px}
+
+/* CONFIG CARD */
+.config-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:22px}
+.config-hdr{padding:14px 20px;background:var(--txl);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.config-hdr-title{font-size:12px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.07em}
+.config-body{padding:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:700px){.config-body{grid-template-columns:1fr}}
+
+.field label{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:700}
+.field select,.field input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:7px;color:var(--txt);font-size:12px;padding:8px 11px;font-family:inherit;outline:none;transition:border-color .2s}
+.field select:focus,.field input:focus{border-color:var(--teal)}
+
+/* CHIPS MULTI SELECT */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{padding:4px 11px;border-radius:14px;border:1px solid var(--border);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;color:var(--muted);background:transparent;font-family:inherit}
+.chip.on{background:var(--txl);border-color:var(--teal);color:var(--teal)}
+.chip:hover:not(.on){border-color:var(--tl);color:var(--tl)}
+
+/* BOUTON GENERATE */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
+.btn-generate{background:var(--teal);color:var(--bg);font-size:14px;padding:13px 28px}
+.btn-generate:hover{background:var(--tl)}
+.btn-generate:disabled{opacity:.5;cursor:not-allowed}
+.btn-sec{background:var(--txl);color:var(--teal);border:1px solid var(--tb)}
+.btn-sec:hover{background:rgba(42,157,143,0.2)}
+.btn-danger{background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.25)}
+
+/* PROGRESS */
+.progress-wrap{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:22px;display:none}
+.progress-title{font-size:12px;font-weight:700;color:var(--teal);margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em}
+.progress-steps{display:flex;flex-direction:column;gap:8px}
+.step{display:flex;align-items:center;gap:10px;font-size:12px}
+.step-icon{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.step-wait{background:rgba(255,255,255,0.05);color:var(--muted)}
+.step-running{background:rgba(42,157,143,0.15);color:var(--teal);animation:pulse-step 1s ease infinite}
+.step-done{background:rgba(46,204,113,0.15);color:var(--green)}
+.step-error{background:rgba(231,76,60,0.15);color:var(--red)}
+@keyframes pulse-step{0%,100%{opacity:.6}50%{opacity:1}}
+.step-label{color:var(--muted)}
+.step-label.active{color:var(--txt)}
+.step-detail{font-size:10px;color:var(--muted);margin-left:32px;margin-top:-4px}
+.progress-bar-wrap{margin-top:14px}
+.progress-bar-track{height:4px;background:var(--s3);border-radius:2px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--tl));border-radius:2px;transition:width .5s}
+
+/* RESULTS */
+.results-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.results-title{font-size:14px;font-weight:700;color:var(--teal)}
+.results-actions{display:flex;gap:8px}
+.results-meta{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* PROSPECT CARDS */
+.prospects-grid{display:flex;flex-direction:column;gap:10px}
+.p-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .2s}
+.p-card:hover{border-color:var(--tb)}
+.p-card-hdr{padding:12px 16px;display:flex;align-items:flex-start;gap:12px;cursor:pointer}
+.p-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}
+.av0{background:rgba(42,157,143,0.2);color:#2A9D8F}
+.av1{background:rgba(155,89,182,0.2);color:#9B59B6}
+.av2{background:rgba(244,162,97,0.2);color:#F4A261}
+.av3{background:rgba(46,204,113,0.2);color:#2ECC71}
+.av4{background:rgba(231,76,60,0.2);color:#E74C3C}
+.av5{background:rgba(52,152,219,0.2);color:#3498DB}
+.av6{background:rgba(26,188,156,0.2);color:#1ABC9C}
+.av7{background:rgba(241,196,15,0.2);color:#F1C40F}
+
+.p-info{flex:1;min-width:0}
+.p-name{font-size:14px;font-weight:700;color:var(--txt)}
+.p-role{font-size:11px;color:var(--tl);margin-top:1px}
+.p-co{font-size:11px;color:var(--muted);margin-top:1px}
+.p-meta{font-size:10px;color:var(--muted);margin-top:3px}
+.p-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.score-badge{font-size:13px;font-weight:800;padding:3px 10px;border-radius:20px}
+.sc-high{background:rgba(46,204,113,0.12);color:var(--green);border:1px solid rgba(46,204,113,0.25)}
+.sc-mid{background:rgba(42,157,143,0.12);color:var(--teal);border:1px solid var(--tb)}
+.sc-low{background:rgba(244,162,97,0.1);color:var(--amber);border:1px solid rgba(244,162,97,0.2)}
+.tags{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.tag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px}
+.tg{background:rgba(42,157,143,0.1);color:var(--teal);border:1px solid var(--tb)}
+.ta{background:rgba(244,162,97,0.1);color:var(--amber);border:1px solid rgba(244,162,97,0.2)}
+.tv{background:rgba(46,204,113,0.1);color:var(--green);border:1px solid rgba(46,204,113,0.2)}
+.tr{background:rgba(231,76,60,0.1);color:var(--red);border:1px solid rgba(231,76,60,0.2)}
+
+/* EXPANDED */
+.p-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border)}
+.p-body.open{display:block}
+.p-tabs{display:flex;gap:6px;padding:12px 0 10px}
+.p-tab{padding:5px 12px;border-radius:16px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:inherit;transition:all .15s}
+.p-tab.on{background:var(--txl);border-color:var(--teal);color:var(--teal)}
+.msg-box{background:var(--s2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.msg-box-top{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border)}
+.msg-box-lbl{font-size:9px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.06em}
+.msg-txt{padding:14px;font-size:12px;line-height:1.75;color:var(--txt);white-space:pre-wrap;min-height:120px}
+.msg-txt.ph{color:var(--muted);font-style:italic}
+.context-box{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;line-height:1.6;color:var(--muted);margin-bottom:10px}
+.context-box strong{color:var(--tl)}
+.p-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+
+/* LOADING DOTS */
+.dots{display:inline-flex;gap:4px;align-items:center}
+.dots span{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:dot 1.2s ease infinite}
+.dots span:nth-child(2){animation-delay:.2s}
+.dots span:nth-child(3){animation-delay:.4s}
+@keyframes dot{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+
+/* EMPTY */
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-icon{font-size:52px;margin-bottom:14px;opacity:.3}
+.empty-txt{font-size:15px;margin-bottom:6px;font-weight:600}
+.empty-sub{font-size:12px;opacity:.7;max-width:380px;margin:0 auto;line-height:1.6}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--s1);border:1px solid var(--tb);border-radius:8px;padding:11px 18px;font-size:12px;z-index:99;display:none;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.toast.show{display:block;animation:tin .3s ease}
+@keyframes tin{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* STAT ROW */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px}
+.stat{background:var(--s1);border:1px solid var(--border);border-radius:9px;padding:14px;border-top:2px solid var(--ac,var(--teal))}
+.stat-val{font-size:24px;font-weight:800;color:var(--ac,var(--teal))}
+.stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+
+/* EXPORT BTN */
+.export-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-left">
+    <div class="logo">TL</div>
+    <div>
+      <div class="title">Générateur ICP Automatique — TL Consulting</div>
+      <div class="sub">Île-de-France &middot; Tous secteurs &middot; Tous profils IT</div>
+    </div>
+  </div>
+  <div class="hdr-badge">⚡ Powered by Claude AI</div>
+</div>
+
+<div class="main">
+
+  <!-- CONFIG -->
+  <div class="config-card">
+    <div class="config-hdr">
+      <div class="config-hdr-title">🎯 Paramètres de génération</div>
+      <div style="font-size:10px;color:var(--muted)">Générez <strong style="color:var(--teal)">10 prospects qualifiés</strong> correspondant à votre ICP TL Consulting</div>
+    </div>
+    <div class="config-body">
+      <div class="field">
+        <label>Profils cibles</label>
+        <div class="chips" id="chips-profils">
+          <button class="chip on" data-val="DSI / CIO / CTO">DSI / CIO / CTO</button>
+          <button class="chip on" data-val="Responsable IT">Responsable IT</button>
+          <button class="chip on" data-val="Chef de projet IT">Chef de projet IT</button>
+          <button class="chip on" data-val="Data Manager">Data / BI</button>
+          <button class="chip on" data-val="Études & Dev">Études &amp; Dev</button>
+          <button class="chip on" data-val="QA / Tests">QA / Tests</button>
+          <button class="chip on" data-val="MOA / MOE">MOA / MOE</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Secteurs prioritaires</label>
+        <div class="chips" id="chips-secteurs">
+          <button class="chip on" data-val="Banque / Finance">Banque / Finance</button>
+          <button class="chip on" data-val="Assurance">Assurance</button>
+          <button class="chip on" data-val="Santé / Pharma">Santé / Pharma</button>
+          <button class="chip on" data-val="Industrie">Industrie</button>
+          <button class="chip on" data-val="Retail">Retail</button>
+          <button class="chip on" data-val="Energie">Énergie</button>
+          <button class="chip on" data-val="Telecom / Media">Telecom / Media</button>
+          <button class="chip on" data-val="Secteur Public">Secteur Public</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Options avancées</label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+          <div class="field"><label>Taille entreprise min.</label>
+            <select id="opt-taille">
+              <option value="">Toutes tailles</option>
+              <option value="ETI">ETI (250–5 000)</option>
+              <option value="Grand groupe" selected>Grand groupe (&gt; 5 000)</option>
+            </select>
+          </div>
+          <div class="field"><label>Nb prospects à générer</label>
+            <select id="opt-nb">
+              <option value="5">5 prospects</option>
+              <option value="10" selected>10 prospects</option>
+              <option value="15">15 prospects</option>
+              <option value="20">20 prospects</option>
+            </select>
+          </div>
+          <div class="field"><label>Exclure déjà contactés</label>
+            <select id="opt-exclude">
+              <option value="oui" selected>Oui — éviter doublons</option>
+              <option value="non">Non</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:0 20px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-generate" id="btn-gen" onclick="startGeneration()">
+        ⚡ Générer mes prospects du jour
+      </button>
+      <div style="font-size:11px;color:var(--muted)">Dernière génération : <span id="last-gen">jamais</span></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-title">🤖 Agent IA en cours de travail...</div>
+    <div class="progress-steps" id="progress-steps"></div>
+    <div class="progress-bar-wrap">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:6px">
+        <span id="prog-label">Initialisation...</span>
+        <span id="prog-pct">0%</span>
+      </div>
+      <div class="progress-bar-track"><div class="progress-bar-fill" id="prog-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stat-row" id="stat-row" style="display:none">
+    <div class="stat" style="--ac:var(--teal)"><div class="stat-val" id="s-total">0</div><div class="stat-lbl">Générés aujourd'hui</div></div>
+    <div class="stat" style="--ac:var(--green)"><div class="stat-val" id="s-high">0</div><div class="stat-lbl">Score ICP ≥ 75</div></div>
+    <div class="stat" style="--ac:var(--amber)"><div class="stat-val" id="s-msg">0</div><div class="stat-lbl">Messages prêts</div></div>
+    <div class="stat" style="--ac:var(--purple)"><div class="stat-val" id="s-pipeline">0</div><div class="stat-lbl">Ajoutés au pipeline</div></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results-zone">
+    <div class="empty">
+      <div class="empty-icon">🎯</div>
+      <div class="empty-txt">Prêt à générer vos prospects</div>
+      <div class="empty-sub">Configurez vos critères ci-dessus et cliquez sur <strong style="color:var(--teal)">Générer mes prospects du jour</strong> — l'agent IA construit une liste de 10 profils qualifiés avec email et message LinkedIn personnalisés.</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== CHIPS ===== */
+document.querySelectorAll('.chip').forEach(function(c){
+  c.onclick=function(){this.classList.toggle('on');};
+});
+
+function getChips(id){
+  return Array.from(document.querySelectorAll('#'+id+' .chip.on')).map(function(c){return c.dataset.val;});
+}
+
+/* ===== STATE ===== */
+var PROSPECTS=[];
+var AVCOLORS=['av0','av1','av2','av3','av4','av5','av6','av7'];
+var ALREADY_SEEN=[];
+try{var _s=localStorage.getItem('tlc_icp_seen');if(_s)ALREADY_SEEN=JSON.parse(_s);}catch(e){}
+
+function saveState(){
+  try{localStorage.setItem('tlc_icp_seen',JSON.stringify(ALREADY_SEEN.slice(-200)));}catch(e){}
+}
+
+/* ===== PROGRESS ===== */
+var STEPS=[
+  {id:'s1',label:'Analyse de votre ICP TL Consulting'},
+  {id:'s2',label:'Recherche de profils en Île-de-France'},
+  {id:'s3',label:'Qualification et scoring ICP'},
+  {id:'s4',label:'Vérification anti-doublons'},
+  {id:'s5',label:'Génération des messages personnalisés'},
+  {id:'s6',label:'Injection dans le pipeline'}
+];
+
+function renderSteps(activeIdx){
+  var el=document.getElementById('progress-steps');
+  el.innerHTML='';
+  STEPS.forEach(function(s,i){
+    var div=document.createElement('div');div.className='step';
+    var icon=document.createElement('div');
+    var lbl=document.createElement('div');lbl.className='step-label';lbl.textContent=s.label;
+    if(i<activeIdx){icon.className='step-icon step-done';icon.textContent='✓';lbl.classList.add('active');}
+    else if(i===activeIdx){icon.className='step-icon step-running';icon.innerHTML='<div class="dots"><span></span><span></span><span></span></div>';}
+    else{icon.className='step-icon step-wait';icon.textContent=i+1;}
+    div.appendChild(icon);div.appendChild(lbl);el.appendChild(div);
+  });
+  var pct=Math.round((activeIdx/(STEPS.length))*100);
+  document.getElementById('prog-bar').style.width=pct+'%';
+  document.getElementById('prog-pct').textContent=pct+'%';
+  document.getElementById('prog-label').textContent=activeIdx<STEPS.length?STEPS[activeIdx].label:'Terminé !';
+}
+
+function setProgress(idx){
+  renderSteps(idx);
+}
+
+/* ===== GENERATION ===== */
+function startGeneration(){
+  var profils=getChips('chips-profils');
+  var secteurs=getChips('chips-secteurs');
+  var taille=document.getElementById('opt-taille').value;
+  var nb=parseInt(document.getElementById('opt-nb').value)||10;
+  var exclude=document.getElementById('opt-exclude').value==='oui';
+
+  if(profils.length===0||secteurs.length===0){
+    toast('Sélectionnez au moins un profil et un secteur','error');return;
+  }
+
+  document.getElementById('btn-gen').disabled=true;
+  document.getElementById('btn-gen').innerHTML='<div class="dots"><span></span><span></span><span></span></div> Génération en cours...';
+  document.getElementById('progress-wrap').style.display='block';
+  document.getElementById('stat-row').style.display='none';
+  setProgress(0);
+
+  var excludeList=exclude?ALREADY_SEEN.slice(-30):[];
+
+  var prompt='Tu es un agent de prospection B2B expert pour TL Consulting, ESN IT française basée à Bezons (95).'
+    +' Tu dois générer une liste de '+nb+' prospects qualifiés et RÉALISTES pour l\'Île-de-France.'
+    +'\n\nCritères ICP :\n'
+    +'- Profils recherchés : '+profils.join(', ')+'\n'
+    +'- Secteurs : '+secteurs.join(', ')+'\n'
+    +(taille?'- Taille entreprise : '+taille+' et plus\n':'')
+    +'- Localisation : Île-de-France (Paris, Hauts-de-Seine, Seine-Saint-Denis, Val-de-Marne, etc.)\n'
+    +(excludeList.length?'- Exclure ces noms déjà contactés : '+excludeList.join(', ')+'\n':'')
+    +'\nTL Consulting : références BNP Paribas, Natixis, BPCE, Crédit Logement, Meritis, Groupe HSBC, Casden.'
+    +' Arguments différenciants : DORA/NIS2, DSI de transition, cybersécurité, cloud, développement applicatif.'
+    +'\n\nGénère '+nb+' prospects FICTIFS mais RÉALISTES (noms plausibles, entreprises réelles, postes cohérents).'
+    +' Pour chaque prospect, génère aussi :'
+    +' 1) un EMAIL de prospection complet (objet + corps 250-300 mots, signé Thomas LECOUP | DG TL Consulting | 06 19 51 08 02)'
+    +' 2) un MESSAGE LINKEDIN court (< 280 caractères, percutant, prénom direct)'
+    +'\n\nRéponds UNIQUEMENT avec un tableau JSON valide (sans markdown, sans backticks) :'
+    +'\n[{'
+    +'\n  "prenom": "...", "nom": "...", "poste": "...", "entreprise": "...", "secteur": "...", "taille": "...",'
+    +'\n  "email_pro": "...", "linkedin": "linkedin.com/in/...", "ville": "... (75/92/93/94/77/78/91/95)",'
+    +'\n  "contexte": "2-3 phrases enjeux IT actuels de cette entreprise",'
+    +'\n  "score": 0-100,'
+    +'\n  "score_raison": "explication courte du score",'
+    +'\n  "tags": ["tag1","tag2"],'
+    +'\n  "email_gen": "Objet : ...\\n\\n---\\n\\nBonjour ..., \\n\\n[corps complet signé]",'
+    +'\n  "linkedin_gen": "message LinkedIn < 280 chars"'
+    +'\n}, ...]'
+    +'\n\nRègles :'
+    +'\n- score basé sur : secteur prioritaire (+25), taille (+25), niveau décisionnaire (+25), email dispo (+15), linkedin (+10)'
+    +'\n- tags exemples : "DORA/NIS2", "Cible prioritaire", "DSI senior", "Fort potentiel ICP", "Data expert", "Cloud", "Cybersécurité"'
+    +'\n- email_gen : personnalisé avec le contexte de l\'entreprise, accroche sur un enjeu réel (DORA, transformation, cloud...)'
+    +'\n- linkedin_gen : commence par le prénom, max 280 chars, CTA clair';
+
+  setTimeout(function(){setProgress(1);},600);
+  setTimeout(function(){setProgress(2);},1400);
+  setTimeout(function(){setProgress(3);},2200);
+
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens:8000,
+      messages:[{role:'user',content:prompt}]
+    })
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    setProgress(4);
+    var txt=(data.content&&data.content[0]&&data.content[0].text)||'[]';
+    txt=txt.replace(/```json|```/g,'').trim();
+    var match=txt.match(/\[[\s\S]*\]/);
+    if(!match) throw new Error('JSON invalide');
+    var list=JSON.parse(match[0]);
+
+    setProgress(5);
+    setTimeout(function(){
+      setProgress(6);
+      setTimeout(function(){
+        PROSPECTS=list;
+        list.forEach(function(p){if(p.nom) ALREADY_SEEN.push(p.prenom+' '+p.nom);});
+        saveState();
+        document.getElementById('last-gen').textContent=new Date().toLocaleDateString('fr-FR')+' à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+        renderResults(list);
+        updateStats(list);
+        document.getElementById('progress-wrap').style.display='none';
+        document.getElementById('btn-gen').disabled=false;
+        document.getElementById('btn-gen').innerHTML='⚡ Regénérer';
+        toast(list.length+' prospects générés et prêts ✓');
+      },600);
+    },800);
+  })
+  .catch(function(e){
+    document.getElementById('progress-wrap').style.display='none';
+    document.getElementById('btn-gen').disabled=false;
+    document.getElementById('btn-gen').innerHTML='⚡ Générer mes prospects du jour';
+    document.getElementById('results-zone').innerHTML='<div class="empty"><div class="empty-icon">❌</div><div class="empty-txt">Erreur de génération</div><div class="empty-sub">'+e.message+'</div></div>';
+    toast('Erreur : '+e.message,'error');
+  });
+}
+
+/* ===== RENDER ===== */
+function updateStats(list){
+  document.getElementById('stat-row').style.display='grid';
+  document.getElementById('s-total').textContent=list.length;
+  document.getElementById('s-high').textContent=list.filter(function(p){return p.score>=75;}).length;
+  document.getElementById('s-msg').textContent=list.filter(function(p){return p.email_gen&&p.email_gen.length>20;}).length;
+  document.getElementById('s-pipeline').textContent=list.length;
+}
+
+function scoreClass(s){return s>=75?'sc-high':s>=50?'sc-mid':'sc-low';}
+function avClass(i){return AVCOLORS[i%AVCOLORS.length];}
+function initials(p){return ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase();}
+
+var openCards={};
+var activeTab={};
+
+function renderResults(list){
+  var zone=document.getElementById('results-zone');
+  if(!list||list.length===0){
+    zone.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-txt">Aucun prospect généré</div></div>';
+    return;
+  }
+  // Trier par score
+  list=list.slice().sort(function(a,b){return (b.score||0)-(a.score||0);});
+
+  var hdr=document.createElement('div');hdr.className='results-hdr';
+  hdr.innerHTML='<div><div class="results-title">📋 '+list.length+' Prospects générés — '+new Date().toLocaleDateString('fr-FR')+'</div>'
+    +'<div class="results-meta">Triés par score ICP · Île-de-France · Tous secteurs</div></div>'
+    +'<div class="export-row">'
+    +'<button class="btn btn-sec" onclick="exportCSV()">📥 Export CSV</button>'
+    +'<button class="btn btn-sec" onclick="sendToAgent()">➡ Envoyer vers Agent</button>'
+    +'</div>';
+
+  var grid=document.createElement('div');grid.className='prospects-grid';
+
+  list.forEach(function(p,i){
+    var card=document.createElement('div');card.className='p-card';card.id='card-'+i;
+
+    // Tags
+    var tags=(p.tags||[]).slice(0,3);
+
+    var hdrDiv=document.createElement('div');hdrDiv.className='p-card-hdr';
+    hdrDiv.onclick=function(){toggleCard(i);};
+    hdrDiv.innerHTML=
+      '<div class="p-avatar '+avClass(i)+'">'+initials(p)+'</div>'
+      +'<div class="p-info">'
+        +'<div class="p-name">'+p.prenom+' '+p.nom+'</div>'
+        +'<div class="p-role">'+p.poste+'</div>'
+        +'<div class="p-co">'+p.entreprise+(p.ville?' &middot; '+p.ville:'')+'</div>'
+        +'<div class="p-meta">'+p.secteur+(p.taille?' &middot; '+p.taille:'')+'</div>'
+      +'</div>'
+      +'<div class="p-right">'
+        +'<div class="score-badge '+scoreClass(p.score||0)+'">'+(p.score||0)+'/100</div>'
+        +'<div class="tags">'+tags.map(function(t){
+          var cls=t.indexOf('DORA')>=0||t.indexOf('NIS')>=0?'tg':t.indexOf('Cible')>=0||t.indexOf('Fort')>=0?'tv':t.indexOf('Cloud')>=0||t.indexOf('Cyber')>=0?'ta':'tg';
+          return '<span class="tag '+cls+'">'+t+'</span>';
+        }).join('')+'</div>'
+        +'<div style="font-size:10px;color:var(--muted)">'+(p.email_gen?'✉ Email prêt':'')+(p.linkedin_gen?' &middot; 🔗 LI prêt':'')+'</div>'
+      +'</div>';
+
+    var body=document.createElement('div');body.className='p-body';body.id='body-'+i;
+    body.innerHTML=
+      '<div class="p-tabs">'
+        +'<button class="p-tab on" onclick="switchPTab('+i+',\'context\')">📋 Contexte</button>'
+        +'<button class="p-tab" onclick="switchPTab('+i+',\'email\')">✉ Email</button>'
+        +'<button class="p-tab" onclick="switchPTab('+i+',\'linkedin\')">🔗 LinkedIn</button>'
+      +'</div>'
+      +'<div id="ptab-'+i+'-context">'
+        +'<div class="context-box"><strong>Enjeux détectés :</strong><br>'+(p.contexte||'—')+'</div>'
+        +'<div class="context-box" style="margin-top:8px"><strong>Raison du score :</strong><br>'+(p.score_raison||'—')+'</div>'
+        +'<div class="context-box" style="margin-top:8px">'
+          +(p.email_pro?'<strong>Email :</strong> '+p.email_pro+'<br>':'')
+          +(p.linkedin?'<strong>LinkedIn :</strong> <a href="https://'+p.linkedin+'" target="_blank" style="color:var(--tl)">'+p.linkedin+'</a>':'')
+        +'</div>'
+      +'</div>'
+      +'<div id="ptab-'+i+'-email" style="display:none">'
+        +'<div class="msg-box">'
+          +'<div class="msg-box-top"><span class="msg-box-lbl">Email de prospection</span>'
+            +'<button class="btn btn-sec" style="padding:4px 10px;font-size:10px" onclick="copyTxt(\'email\','+i+')">📋 Copier</button>'
+          +'</div>'
+          +'<div class="msg-txt" id="email-txt-'+i+'">'+(p.email_gen||'Non généré')+'</div>'
+        +'</div>'
+      +'</div>'
+      +'<div id="ptab-'+i+'-linkedin" style="display:none">'
+        +'<div class="msg-box">'
+          +'<div class="msg-box-top"><span class="msg-box-lbl">Message LinkedIn (&lt;280 car.)</span>'
+            +'<button class="btn btn-sec" style="padding:4px 10px;font-size:10px" onclick="copyTxt(\'linkedin\','+i+')">📋 Copier</button>'
+          +'</div>'
+          +'<div class="msg-txt" id="li-txt-'+i+'">'+(p.linkedin_gen||'Non généré')+'</div>'
+        +'</div>'
+        +(p.linkedin_gen?'<div style="font-size:10px;color:var(--muted);margin-top:6px">'+( p.linkedin_gen.length)+' / 280 caractères</div>':'')
+      +'</div>'
+      +'<div class="p-actions">'
+        +'<button class="btn btn-sec" style="font-size:11px;padding:6px 12px" onclick="regenMsg('+i+')">✨ Régénérer messages</button>'
+        +'<button class="btn btn-danger" style="font-size:11px;padding:6px 12px" onclick="removeProspect('+i+')">🗑 Supprimer</button>'
+      +'</div>';
+
+    card.appendChild(hdrDiv);
+    card.appendChild(body);
+    grid.appendChild(card);
+  });
+
+  zone.innerHTML='';
+  zone.appendChild(hdr);
+  zone.appendChild(grid);
+}
+
+function toggleCard(i){
+  var b=document.getElementById('body-'+i);
+  if(b.classList.contains('open')) b.classList.remove('open');
+  else b.classList.add('open');
+}
+
+function switchPTab(i,tab){
+  var tabs=['context','email','linkedin'];
+  tabs.forEach(function(t){
+    var el=document.getElementById('ptab-'+i+'-'+t);
+    if(el) el.style.display=t===tab?'block':'none';
+  });
+  var body=document.getElementById('body-'+i);
+  if(body) body.querySelectorAll('.p-tab').forEach(function(btn,bi){
+    btn.classList.toggle('on',['context','email','linkedin'][bi]===tab);
+  });
+}
+
+function copyTxt(type,i){
+  var id=type==='email'?'email-txt-'+i:'li-txt-'+i;
+  var txt=document.getElementById(id).textContent;
+  navigator.clipboard.writeText(txt).then(function(){toast('Copié ✓');});
+}
+
+function removeProspect(i){
+  PROSPECTS.splice(i,1);
+  renderResults(PROSPECTS);
+  updateStats(PROSPECTS);
+}
+
+/* ===== REGEN MSG ===== */
+function regenMsg(i){
+  var p=PROSPECTS[i];
+  if(!p) return;
+  var prompt='Génère pour ce prospect :'
+    +'\nNom : '+p.prenom+' '+p.nom
+    +'\nPoste : '+p.poste
+    +'\nEntreprise : '+p.entreprise+' ('+p.secteur+')'
+    +'\nContexte : '+p.contexte
+    +'\n\n1) EMAIL complet (objet + corps 250-300 mots, accroche personnalisée, signé Thomas LECOUP | DG TL Consulting | 06 19 51 08 02)'
+    +'\n2) MESSAGE LINKEDIN < 280 caractères'
+    +'\n\nRéponds UNIQUEMENT JSON : {"email_gen":"...","linkedin_gen":"..."}';
+
+  var emailEl=document.getElementById('email-txt-'+i);
+  var liEl=document.getElementById('li-txt-'+i);
+  if(emailEl) emailEl.textContent='Génération...';
+  if(liEl) liEl.textContent='Génération...';
+
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,messages:[{role:'user',content:prompt}]})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    var txt=(data.content&&data.content[0]&&data.content[0].text)||'{}';
+    txt=txt.replace(/```json|```/g,'').trim();
+    var obj=JSON.parse(txt.match(/\{[\s\S]*\}/)[0]);
+    if(obj.email_gen){PROSPECTS[i].email_gen=obj.email_gen;if(emailEl)emailEl.textContent=obj.email_gen;}
+    if(obj.linkedin_gen){PROSPECTS[i].linkedin_gen=obj.linkedin_gen;if(liEl)liEl.textContent=obj.linkedin_gen;}
+    toast('Messages régénérés ✓');
+  })
+  .catch(function(){toast('Erreur régénération','error');});
+}
+
+/* ===== EXPORT CSV ===== */
+function exportCSV(){
+  if(!PROSPECTS.length){toast('Aucun prospect à exporter','error');return;}
+  var rows=['Prenom;Nom;Poste;Entreprise;Secteur;Taille;Email;LinkedIn;Ville;Score;Contexte'];
+  PROSPECTS.forEach(function(p){
+    rows.push([p.prenom,p.nom,p.poste,p.entreprise,p.secteur,p.taille,p.email_pro||'',p.linkedin||'',p.ville||'',p.score||'','"'+(p.contexte||'').replace(/"/g,"'")+'"'].join(';'));
+  });
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows.join('\n'));
+  a.download='prospects_icp_tlc_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  toast('CSV exporté ✓');
+}
+
+/* ===== SEND TO AGENT ===== */
+function sendToAgent(){
+  if(!PROSPECTS.length){toast('Aucun prospect à envoyer','error');return;}
+  // Sauvegarder dans localStorage pour que l'agent puisse les lire
+  try{
+    var existing=[];
+    try{var _e=localStorage.getItem('tlc_prospects');if(_e)existing=JSON.parse(_e);}catch(e2){}
+    var toAdd=PROSPECTS.map(function(p){
+      return {
+        id:Date.now().toString(36)+Math.random().toString(36).slice(2),
+        prenom:p.prenom,nom:p.nom,poste:p.poste,entreprise:p.entreprise,
+        secteur:p.secteur,taille:p.taille,email:p.email_pro||'',
+        linkedin:p.linkedin||'',ville:p.ville||'',contexte:p.contexte||'',
+        statut:'new',email_gen:p.email_gen||'',linkedin_gen:p.linkedin_gen||'',
+        notes:'',score:p.score||0,date_ajout:new Date().toLocaleDateString('fr-FR')
+      };
+    });
+    var merged=toAdd.concat(existing);
+    localStorage.setItem('tlc_prospects',JSON.stringify(merged));
+    toast(toAdd.length+' prospects envoyés vers l\'Agent ✓');
+    setTimeout(function(){
+      window.open('https://tlexecutive.github.io/agent-prospection','_blank');
+    },1000);
+  }catch(e){toast('Erreur envoi','error');}
+}
+
+/* ===== TOAST ===== */
+function toast(msg,type){
+  var el=document.getElementById('toast');
+  el.textContent=msg;
+  el.style.borderColor=type==='error'?'rgba(231,76,60,.4)':'var(--tb)';
+  el.style.color=type==='error'?'var(--red)':'var(--txt)';
+  el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},2800);
+}
+</script>
+</body>
+</html>
