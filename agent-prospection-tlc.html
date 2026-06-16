@@ -429,6 +429,11 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 <div class="toast" id="toast"></div>
 
 <script>
+/* ===== AVERTISSEMENT OUVERTURE LOCALE ===== */
+if(window.location.protocol==='file:'){
+  document.body.innerHTML='<div style="font-family:Arial,sans-serif;background:#0B1A1C;color:#F0EDE8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px"><div style="background:#1A3035;border:2px solid rgba(231,76,60,0.4);border-radius:12px;padding:32px;max-width:480px;text-align:center"><div style="font-size:48px;margin-bottom:16px">⚠️</div><div style="font-size:18px;font-weight:700;color:#E74C3C;margin-bottom:12px">Fichier ouvert en local</div><div style="font-size:13px;color:#9A9A9A;line-height:1.7;margin-bottom:20px">Vos données sont sauvegardées sur <strong style="color:#2A9D8F">GitHub Pages</strong>.<br>Ouvrir ce fichier localement crée un espace vide.<br><br>Utilisez toujours cette URL :</div><a href=\"https://tlexecutive.github.io/agent-prospection\" style=\"display:inline-block;background:#2A9D8F;color:#0B1A1C;font-weight:700;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none\">👉 Ouvrir l\'Agent sur GitHub Pages</a><div style=\"margin-top:14px;font-size:11px;color:#9A9A9A\">Ajoutez cette URL en favori ⭐ dans Chrome</div></div></div>';
+}
+
 /* ===== DATA ===== */
 var prospects = [];
 var activeId = null;
