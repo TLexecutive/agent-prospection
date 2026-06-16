@@ -850,6 +850,7 @@ function addProspect(){
     email_gen:'', linkedin_gen:'', notes:'', score:0, date_ajout:new Date().toLocaleDateString('fr-FR')
   };
   p.score = calcScore(p);
+  addLog(p,'➕ Prospect ajouté manuellement');
   prospects.unshift(p);
   save(); updateStats(); renderList(); selectProspect(p.id);
   // Reset form
@@ -989,7 +990,7 @@ function selectProspect(id){
   // Notes
   +'<div class="section">'
     +'<div class="section-hdr">Notes & suivi</div>'
-    +'<div class="notes-area"><textarea id="notes-txt" placeholder="Historique des échanges, résumé d\'appel, prochaine action..." onblur="saveNotes(\''+p.id+'\')" >'+p.notes+'</textarea></div>'
+    +'<div class="notes-area"><textarea id="notes-txt" placeholder="Journal d\'activité automatique + vos notes personnelles (résumé d\'appel, prochaine action...)" onblur="saveNotes(\''+p.id+'\')" >'+p.notes+'</textarea></div>'
   +'</div>';
 
   // Restaurer messages générés si existants
@@ -1026,14 +1027,16 @@ function generateMessage(id){
   var sysPrompt='Tu es Thomas LECOUP, Gérant de TL Consulting, ESN IT française basée à Bezons (95). '
     +'Tu écris en ton propre nom, comme si tu envoyais un email personnel à un pair que tu ne connais pas encore. '
     +'Ton style : direct, chaleureux, entre professionnels du même niveau. Pas de jargon corporate, pas de structure visible intro/corps/CTA. '
-    +'Tu parles comme un humain qui a fait ses recherches, pas comme un commercial qui déroule un pitch. '
+    +'RÈGLE ABSOLUE : ne jamais inventer ni affirmer des faits sur les projets internes du prospect. '
+    +'Pas de "j\'ai vu que vous faites X", "votre projet de refonte", "votre migration en cours", "votre transformation". '
+    +'Tu parles de ce que vivent généralement les personnes dans ce poste et ce secteur — jamais de détails inventés sur leur entreprise. '
     +'TL Consulting place des consultants IT experts (dev, cloud, cybersécurité, infogérance, DSI de transition). '
     +'Références : BNP Paribas, Natixis, BPCE, Casden, Meritis, HSBC.'
     +(isLinkedin
       ? ' Pour LinkedIn : 3 phrases max, 200 caractères, commence directement par le prénom, une question ouverte à la fin. Pas de "Je me permets de...", pas de "Dans le cadre de...".'
       : ' Pour l\'email : 6-8 lignes maximum, une seule idée forte, une question directe à la fin. '
-        +'Commence par une observation concrète sur leur contexte (pas une généralité). '
-        +'Évite absolument : "enjeux stratégiques", "leviers concrets", "posture", "accompagner", "valeur ajoutée", "dans le cadre de", "je me permets". '
+        +'Commence par une réalité concrète que vit généralement quelqu\'un dans ce poste et ce secteur. '
+        +'Évite absolument : "enjeux stratégiques", "leviers concrets", "posture", "accompagner", "valeur ajoutée", "dans le cadre de", "je me permets", "optimisation". '
         +'La signature : Thomas LECOUP | Gérant TL Consulting | 06 19 51 08 02');
 
   var userPrompt=(isLinkedin?'Message LinkedIn':'Email de prospection')+' pour '
@@ -1063,7 +1066,8 @@ function generateMessage(id){
     var txt=(data.content&&data.content[0]&&data.content[0].text)||'Erreur lors de la génération.';
     body.className='message-box-body';
     body.textContent=txt;
-    if(isLinkedin) p.linkedin_gen=txt; else p.email_gen=txt;
+    if(isLinkedin){ p.linkedin_gen=txt; addLog(p,'🔗 Message LinkedIn généré'); }
+    else { p.email_gen=txt; addLog(p,'✉ Email de prospection généré'); }
     save();
     btn.disabled=false;
     btn.innerHTML='✨ Régénérer';
@@ -1091,11 +1095,25 @@ function saveNotes(id){
   save();
 }
 
+/* ===== JOURNAL D'ACTIVITÉ ===== */
+function addLog(p, action){
+  if(!p) return;
+  var now=new Date();
+  var ts='['+now.toLocaleDateString('fr-FR')+' '+now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})+'] ';
+  p.notes=(p.notes?p.notes+'\n':'')+ts+action;
+  save();
+  // Rafraîchir la zone notes si ce prospect est affiché
+  var el=document.getElementById('notes-txt');
+  if(el && activeId===p.id) el.value=p.notes;
+}
+
 /* ===== STATUT ===== */
 function updateStatut(id,val){
   var p=prospects.find(function(x){return x.id===id;});
   if(!p) return;
+  var ancien=STATUS_LABELS[p.statut]||p.statut;
   p.statut=val; save(); updateStats(); renderList();
+  addLog(p,'📋 Statut : '+ancien+' → '+STATUS_LABELS[val]);
   toast('Statut mis à jour : '+STATUS_LABELS[val]);
 }
 
@@ -1172,6 +1190,7 @@ function parseCSV(file){
       var key=dedupKey(p);
       var isDup=prospects.some(function(ex){ return dedupKey(ex)===key; });
       if(isDup){ added--; continue; }
+      addLog(p,'📥 Prospect importé via CSV');
       prospects.unshift(p);
       added++;
     }
@@ -1243,6 +1262,7 @@ function sendDraftOutlook(pid){
 
   // Marquer comme envoyé
   p.statut='sent'; save(); renderList();
+  addLog(p,'📨 Email envoyé en brouillon Outlook (destinataire : '+p.email+')');
   var btn=document.getElementById('btn-draft');
   if(btn){btn.textContent='✅ Outlook ouvert';btn.style.background='rgba(46,204,113,0.12)';btn.style.color='#2ECC71';btn.style.borderColor='rgba(46,204,113,0.3)';}
   toast('📨 Outlook ouvert avec l\'email prêt ✓');
