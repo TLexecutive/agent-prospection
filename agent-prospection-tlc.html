@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agent Prospection IA — TL Consulting</title>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1212,123 +1213,71 @@ var MSAL_SCOPES    = ['Mail.ReadWrite'];
 var MSAL_REDIRECT  = 'https://tlexecutive.github.io/agent-prospection';
 var outlookToken   = null;
 
-// Charger MSAL depuis CDN
-function loadMSAL(cb){
-  if(window.msal){ cb(); return; }
-  var s=document.createElement('script');
-  s.src='https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js';
-  s.onload=cb; document.head.appendChild(s);
-}
-
-function getMSALApp(){
-  return new msal.PublicClientApplication({
-    auth:{
-      clientId: MSAL_CLIENT_ID,
-      authority: 'https://login.microsoftonline.com/'+MSAL_TENANT_ID,
-      redirectUri: MSAL_REDIRECT
-    },
-    cache:{ cacheLocation:'localStorage', storeAuthStateInCookie:false }
-  });
-}
-
-async function getOutlookToken(){
-  if(outlookToken) return outlookToken;
-  loadMSAL(function(){});
-  await new Promise(function(r){setTimeout(r,500);});
-  var msalApp = getMSALApp();
-  await msalApp.initialize();
-  // Gérer le retour du redirect si présent
-  try{ await msalApp.handleRedirectPromise(); }catch(e){}
-  var accounts = msalApp.getAllAccounts();
-  if(accounts.length > 0){
-    try{
-      var res = await msalApp.acquireTokenSilent({scopes:MSAL_SCOPES, account:accounts[0]});
-      outlookToken = res.accessToken;
-      return outlookToken;
-    }catch(e){}
-  }
-  // Connexion interactive popup
-  var res = await msalApp.acquireTokenPopup({scopes:MSAL_SCOPES});
-  outlookToken = res.accessToken;
-  return outlookToken;
-}
-
 async function sendDraftOutlook(pid){
-  var p = prospects.find(function(x){return x.id===pid;});
-  if(!p){ toast('Prospect introuvable','error'); return; }
-  var emailTxt = p.email_gen || '';
-  if(!emailTxt){ toast('Générez d\'abord l\'email avec IA','error'); return; }
-  if(!p.email){ toast('Adresse email du prospect manquante','error'); return; }
+  var p=prospects.find(function(x){return x.id===pid;});
+  if(!p){toast('Prospect introuvable','error');return;}
+  var emailTxt=p.email_gen||'';
+  if(!emailTxt){toast('Générez d\'abord l\'email avec IA','error');return;}
+  if(!p.email){toast('Adresse email du prospect manquante','error');return;}
 
-  var btn = document.getElementById('btn-draft');
-  if(btn){ btn.disabled=true; btn.textContent='⏳ Envoi...'; }
+  var btn=document.getElementById('btn-draft');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Connexion...';}
 
   try{
-    // Extraire objet et corps
-    var lines = emailTxt.split('\n');
-    var subject = '';
-    var bodyLines = [];
-    var pastObjet = false;
-    for(var i=0;i<lines.length;i++){
-      if(!pastObjet && (lines[i].toLowerCase().startsWith('objet:') || lines[i].toLowerCase().startsWith('objet :'))) {
-        subject = lines[i].replace(/^objet\s*:\s*/i,'').trim();
-        pastObjet = true;
-      } else if(pastObjet) {
-        bodyLines.push(lines[i]);
-      }
-    }
-    if(!subject){ subject = 'TL Consulting — '+p.poste+' chez '+p.entreprise; }
-    var body = bodyLines.join('\n').trim() || emailTxt;
+    if(typeof msal==='undefined') throw new Error('MSAL non chargé — rechargez la page');
 
-    var token = await getOutlookToken();
-
-    // Créer le brouillon via Microsoft Graph
-    var draft = {
-      subject: subject,
-      importance: 'normal',
-      isDraft: true,
-      body: {
-        contentType: 'Text',
-        content: body
-      },
-      toRecipients: [{
-        emailAddress: {
-          address: p.email,
-          name: p.prenom+' '+p.nom
-        }
-      }],
-      from: {
-        emailAddress: {
-          address: 'thomas.lecoup@tl-consulting-france.com',
-          name: 'Thomas LECOUP'
-        }
-      }
-    };
-
-    var resp = await fetch('https://graph.microsoft.com/v1.0/me/messages', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer '+token,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(draft)
+    var msalApp=new msal.PublicClientApplication({
+      auth:{clientId:MSAL_CLIENT_ID,authority:'https://login.microsoftonline.com/'+MSAL_TENANT_ID,redirectUri:MSAL_REDIRECT},
+      cache:{cacheLocation:'localStorage',storeAuthStateInCookie:false}
     });
+    await msalApp.initialize();
+    try{await msalApp.handleRedirectPromise();}catch(e){}
 
-    if(!resp.ok){
-      var err = await resp.json();
-      throw new Error(err.error&&err.error.message||'Erreur Graph API '+resp.status);
+    if(!outlookToken){
+      var accounts=msalApp.getAllAccounts();
+      if(accounts.length>0){
+        try{var r1=await msalApp.acquireTokenSilent({scopes:MSAL_SCOPES,account:accounts[0]});outlookToken=r1.accessToken;}catch(e){}
+      }
+      if(!outlookToken){
+        if(btn) btn.textContent='⏳ Connexion Microsoft...';
+        var r2=await msalApp.acquireTokenPopup({scopes:MSAL_SCOPES});
+        outlookToken=r2.accessToken;
+      }
     }
 
-    // Mettre à jour le statut du prospect
-    p.statut = 'sent';
-    save(); renderList();
+    if(btn) btn.textContent='⏳ Création brouillon...';
 
-    if(btn){ btn.disabled=false; btn.textContent='✅ Brouillon créé'; btn.style.background='rgba(46,204,113,0.12)'; btn.style.color='#2ECC71'; btn.style.borderColor='rgba(46,204,113,0.3)'; }
+    // Extraire objet et corps
+    var lines=emailTxt.split('\n'),subject='',bodyLines=[],past=false;
+    for(var i=0;i<lines.length;i++){
+      if(!past&&/^objet\s*:/i.test(lines[i])){subject=lines[i].replace(/^objet\s*:\s*/i,'').trim();past=true;}
+      else if(past) bodyLines.push(lines[i]);
+    }
+    if(!subject) subject='TL Consulting — '+p.poste+' chez '+p.entreprise;
+    var body=bodyLines.join('\n').trim()||emailTxt;
+
+    var resp=await fetch('https://graph.microsoft.com/v1.0/me/messages',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+outlookToken,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        subject:subject,isDraft:true,
+        body:{contentType:'Text',content:body},
+        toRecipients:[{emailAddress:{address:p.email,name:p.prenom+' '+p.nom}}]
+      })
+    });
+    if(!resp.ok){
+      if(resp.status===401){outlookToken=null;}
+      var err=await resp.json();
+      throw new Error(err.error&&err.error.message||'Erreur Graph '+resp.status);
+    }
+
+    p.statut='sent'; save(); renderList();
+    if(btn){btn.disabled=false;btn.textContent='✅ Brouillon créé';btn.style.background='rgba(46,204,113,0.12)';btn.style.color='#2ECC71';btn.style.borderColor='rgba(46,204,113,0.3)';}
     toast('📨 Brouillon créé dans Outlook pour '+p.prenom+' '+p.nom+' ✓');
 
   }catch(e){
-    if(btn){ btn.disabled=false; btn.textContent='📨 Brouillon'; }
-    toast('Erreur Outlook : '+e.message,'error');
+    if(btn){btn.disabled=false;btn.textContent='📨 Brouillon';}
+    toast('Erreur : '+e.message,'error');
   }
 }
 
