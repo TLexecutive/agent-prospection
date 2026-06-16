@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Prospection IA — TL Consulting v2</title>
-
+<title>Agent Prospection IA — TL Consulting</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1024,20 +1023,30 @@ function generateMessage(id){
   body.innerHTML='<div class="loading-dots"><span></span><span></span><span></span></div> Génération en cours...';
 
   var isLinkedin=currentOutput==='linkedin';
-  var sysPrompt='Tu es un expert en développement commercial B2B pour une ESN française premium. TL Consulting est une société de conseil IT et recrutement IT basée à Bezons (95), dirigée par Thomas LECOUP. Spécialités : mise à disposition de consultants IT (développement, infogérance, cybersécurité, cloud, DSI de transition). Références : BNP, Natixis, BPCE, Casden, Meritis, Groupe HSBC. '
-    +(isLinkedin?'Tu rédiges un MESSAGE LINKEDIN court et percutant (max 300 caractères, ton direct, pas de formule générique). Utilise les infos du prospect pour personnaliser. Ne commence jamais par "Bonjour" générique, utilise le prénom directement. Signe : Thomas LECOUP - TL Consulting.'
-               :'Tu rédiges un EMAIL de prospection professionnel et personnalisé (250-350 mots). Objet percutant inclus en première ligne précédé de "Objet :". Structure : accroche personnalisée, valeur apportée, appel à action court. Ton professionnel mais humain. Signe : Thomas LECOUP | Gérant TL Consulting | 06 19 51 08 02 | thomas.lecoup@tl-consulting-france.com');
+  var sysPrompt='Tu es Thomas LECOUP, Gérant de TL Consulting, ESN IT française basée à Bezons (95). '
+    +'Tu écris en ton propre nom, comme si tu envoyais un email personnel à un pair que tu ne connais pas encore. '
+    +'Ton style : direct, chaleureux, entre professionnels du même niveau. Pas de jargon corporate, pas de structure visible intro/corps/CTA. '
+    +'Tu parles comme un humain qui a fait ses recherches, pas comme un commercial qui déroule un pitch. '
+    +'TL Consulting place des consultants IT experts (dev, cloud, cybersécurité, infogérance, DSI de transition). '
+    +'Références : BNP Paribas, Natixis, BPCE, Casden, Meritis, HSBC.'
+    +(isLinkedin
+      ? ' Pour LinkedIn : 3 phrases max, 200 caractères, commence directement par le prénom, une question ouverte à la fin. Pas de "Je me permets de...", pas de "Dans le cadre de...".'
+      : ' Pour l\'email : 6-8 lignes maximum, une seule idée forte, une question directe à la fin. '
+        +'Commence par une observation concrète sur leur contexte (pas une généralité). '
+        +'Évite absolument : "enjeux stratégiques", "leviers concrets", "posture", "accompagner", "valeur ajoutée", "dans le cadre de", "je me permets". '
+        +'La signature : Thomas LECOUP | Gérant TL Consulting | 06 19 51 08 02');
 
-  var userPrompt='Rédige un '+(isLinkedin?'message LinkedIn':'email')
-    +' de prospection pour :\n'
-    +'- Nom : '+p.prenom+' '+p.nom+'\n'
-    +'- Poste : '+p.poste+'\n'
-    +'- Entreprise : '+p.entreprise+'\n'
-    +(p.secteur?'- Secteur : '+p.secteur+'\n':'')
-    +(p.taille?'- Taille : '+p.taille+'\n':'')
-    +(p.ville?'- Localisation : '+p.ville+'\n':'')
-    +(p.contexte?'- Contexte spécifique : '+p.contexte+'\n':'')
-    +'\nArguments différenciants à valoriser selon le contexte : conformité DORA/NIS2, transformation digitale, renfort DSI, placement de consultants IT experts, accompagnement de projets cloud/cybersécurité/développement.';
+  var userPrompt=(isLinkedin?'Message LinkedIn':'Email de prospection')+' pour '
+    +p.prenom+' '+p.nom+', '+p.poste+' chez '+p.entreprise
+    +(p.secteur?' ('+p.secteur+')'  :'')
+    +(p.contexte?' — contexte : '+p.contexte:'')
+    +'.\n\n'
+    +(isLinkedin
+      ? 'Écris un message LinkedIn de 3 phrases max. Direct, curieux, entre pairs. Une question ouverte à la fin. Commence par le prénom.'
+      : 'Écris un email court (6-8 lignes) avec objet sur la première ligne précédé de "Objet :". '
+        +'Commence par une observation précise sur leur situation réelle — pas une généralité sur le secteur. '
+        +'Une seule idée, une question simple à la fin. '
+        +'Ton : un pair qui a fait ses recherches et propose une conversation, pas un commercial qui vend.');
 
   fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
@@ -1206,20 +1215,39 @@ function loadDemoData(){
   toast('8 prospects de démo chargés ✓');
 }
 
-/* ===== OUTLOOK BROUILLON (mailto) ===== */
+/* ===== OUTLOOK BROUILLON (mailto — ouverture directe Outlook) ===== */
+
+
 function sendDraftOutlook(pid){
   var p=prospects.find(function(x){return x.id===pid;});
-  if(!p||!p.email_gen){toast('Generez l email IA d abord','error');return;}
-  if(!p.email){toast('Email prospect manquant','error');return;}
-  var lines=p.email_gen.split('\n'),subject='',body=[],ok=false;
-  for(var i=0;i<lines.length;i++){if(!ok&&/^objet\s*:/i.test(lines[i])){subject=lines[i].replace(/^objet\s*:\s*/i,'').trim();ok=true;}else if(ok)body.push(lines[i]);}
-  if(!subject)subject='TL Consulting - '+p.poste+' chez '+p.entreprise;
-  window.open('mailto:'+encodeURIComponent(p.email)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body.join('\n').trim()));
-  p.statut='sent';save();renderList();
+  if(!p){toast('Prospect introuvable','error');return;}
+  var emailTxt=p.email_gen||'';
+  if(!emailTxt){toast('Générez d\'abord l\'email avec IA','error');return;}
+  if(!p.email){toast('Adresse email du prospect manquante','error');return;}
+
+  // Extraire objet et corps
+  var lines=emailTxt.split('\n'),subject='',bodyLines=[],past=false;
+  for(var i=0;i<lines.length;i++){
+    if(!past&&/^objet\s*:/i.test(lines[i])){subject=lines[i].replace(/^objet\s*:\s*/i,'').trim();past=true;}
+    else if(past) bodyLines.push(lines[i]);
+  }
+  if(!subject) subject='TL Consulting — '+p.poste+' chez '+p.entreprise;
+  var body=bodyLines.join('\n').trim()||emailTxt;
+
+  // Ouvrir Outlook via mailto — crée un brouillon directement
+  var mailto='mailto:'+encodeURIComponent(p.email)
+    +'?subject='+encodeURIComponent(subject)
+    +'&body='+encodeURIComponent(body);
+
+  window.location.href=mailto;
+
+  // Marquer comme envoyé
+  p.statut='sent'; save(); renderList();
   var btn=document.getElementById('btn-draft');
-  if(btn){btn.textContent='OK Outlook ouvert';btn.style.background='rgba(46,204,113,0.12)';btn.style.color='#2ECC71';}
-  toast('Outlook ouvert avec l email pret');
+  if(btn){btn.textContent='✅ Outlook ouvert';btn.style.background='rgba(46,204,113,0.12)';btn.style.color='#2ECC71';btn.style.borderColor='rgba(46,204,113,0.3)';}
+  toast('📨 Outlook ouvert avec l\'email prêt ✓');
 }
+
 /* ===== PURGE DOUBLONS ===== */
 function purgeDoublons(){
   var avant=prospects.length;

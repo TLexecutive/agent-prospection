@@ -428,9 +428,14 @@ function startGeneration(){
     setProgress(5);
 
     // 2e appel : messages en texte libre avec délimiteurs (évite les problèmes JSON)
-    var p2='Pour chaque prospect, écris un email et un message LinkedIn.'
+    var p2='Tu es Thomas LECOUP, Gérant de TL Consulting (ESN IT, Bezons 95). Tu écris des emails de prospection courts et humains, entre pairs, pas des pitchs commerciaux.'
+      +'\nStyle : direct, chaleureux, 6-8 lignes max, une seule idée, une question à la fin.'
+      +'\nInterdits absolus : "enjeux stratégiques", "leviers concrets", "posture", "accompagner", "valeur ajoutée", "je me permets", "dans le cadre de", "optimisation".'
+      +'\nMessages LinkedIn : 3 phrases, commence par le prénom, 200 chars max.'
+      +'\nSignature email : Thomas LECOUP | Gérant TL Consulting | 06 19 51 08 02'
+      +'\n\nPour chaque prospect, écris un email et un message LinkedIn.'
       +'\nUtilise EXACTEMENT ce format avec délimiteurs (N = numéro 0 à '+(list.length-1)+'):\n'
-      +'===EMAIL_0===\nObjet: [titre]\n\n[corps 150 mots signé Thomas LECOUP Gérant TL Consulting 06 19 51 08 02]\n===LI_0===\n[LinkedIn max 200 chars]\n\n===EMAIL_1===\n...\n'
+      +'===EMAIL_0===\nObjet: [titre court et concret]\n\n[email 6-8 lignes, commence par observation précise, une question directe à la fin, signature]\n===LI_0===\n[LinkedIn 3 phrases commence par prénom]\n\n===EMAIL_1===\n...\n'
       +'\nProspects:\n'+list.map(function(p,i){return i+'. '+p.prenom+' '+p.nom+' - '+p.poste+' chez '+p.entreprise+' ('+p.secteur+') - '+p.contexte;}).join('\n');
 
     return fetch('https://api.anthropic.com/v1/messages',{
