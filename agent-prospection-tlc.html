@@ -1206,7 +1206,7 @@ function loadDemoData(){
   toast('8 prospects de démo chargés ✓');
 }
 
-/* ===== OUTLOOK BROUILLON (mailto) ===== */ (Microsoft Graph MSAL) ===== */
+/* ===== OUTLOOK BROUILLON (mailto) ===== */ (Microsoft (mailto)) ===== */
 function sendDraftOutlook(pid){
   var p=prospects.find(function(x){return x.id===pid;});
   if(!p||!p.email_gen){toast('Generez l email IA d abord','error');return;}
