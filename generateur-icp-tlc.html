@@ -225,6 +225,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--tx
       </div>
     </div>
     <div style="padding:0 20px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="flex:1;min-width:220px">
+        <label style="display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:5px">Clé API Anthropic <span style="color:var(--red)">*</span></label>
+        <input type="password" id="api-key" placeholder="sk-ant-..." style="width:100%;background:var(--s2);border:1px solid var(--border);border-radius:7px;color:var(--txt);font-size:12px;padding:8px 11px;font-family:inherit;outline:none" oninput="saveKey()">
+        <div style="font-size:9px;color:var(--muted);margin-top:4px">Stockée localement · Jamais transmise ailleurs · <a href="https://console.anthropic.com/keys" target="_blank" style="color:var(--tl)">Obtenir une clé</a></div>
+      </div>
       <button class="btn btn-generate" id="btn-gen" onclick="startGeneration()">
         ⚡ Générer mes prospects du jour
       </button>
@@ -267,7 +272,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--tx
 <div class="toast" id="toast"></div>
 
 <script>
-/* ===== CHIPS ===== */
+/* ===== CLE API ===== */
+function saveKey(){
+  var k=document.getElementById('api-key').value.trim();
+  try{localStorage.setItem('tlc_api_key',k);}catch(e){}
+}
+(function(){
+  try{var k=localStorage.getItem('tlc_api_key');if(k)document.getElementById('api-key').value=k;}catch(e){}
+})();
 document.querySelectorAll('.chip').forEach(function(c){
   c.onclick=function(){this.classList.toggle('on');};
 });
@@ -326,6 +338,11 @@ function startGeneration(){
   var nb=parseInt(document.getElementById('opt-nb').value)||10;
   var exclude=document.getElementById('opt-exclude').value==='oui';
 
+  var apiKey=document.getElementById('api-key').value.trim();
+  if(!apiKey||!apiKey.startsWith('sk-ant-')){
+    toast('Saisissez votre clé API Anthropic (sk-ant-...)','error');return;
+  }
+
   if(profils.length===0||secteurs.length===0){
     toast('Sélectionnez au moins un profil et un secteur','error');return;
   }
@@ -375,7 +392,12 @@ function startGeneration(){
 
   fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
     body:JSON.stringify({
       model:'claude-sonnet-4-6',
       max_tokens:8000,
@@ -572,9 +594,15 @@ function regenMsg(i){
   if(emailEl) emailEl.textContent='Génération...';
   if(liEl) liEl.textContent='Génération...';
 
+  var apiKey2=document.getElementById('api-key').value.trim()||localStorage.getItem('tlc_api_key')||'';
   fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':apiKey2,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
     body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,messages:[{role:'user',content:prompt}]})
   })
   .then(function(r){return r.json();})
