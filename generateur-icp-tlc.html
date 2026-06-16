@@ -200,6 +200,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--tx
       <div class="field">
         <label>Options avancées</label>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+          <div class="field">
+            <label>🏢 Cibler une société précise <span style="color:var(--amber);font-size:9px">(optionnel)</span></label>
+            <input type="text" id="opt-societe" placeholder="Ex: BNP Paribas, Crédit Agricole..." style="background:var(--s2);border:1px solid var(--border);border-radius:7px;color:var(--txt);font-size:12px;padding:8px 11px;font-family:inherit;outline:none;transition:border-color .2s;width:100%" onfocus="this.style.borderColor='var(--teal)'" onblur="this.style.borderColor=''" oninput="updateModeLabel()">
+            <div style="font-size:9px;color:var(--muted);margin-top:4px" id="societe-hint">Laissez vide pour chercher sur tous les secteurs cochés</div>
+          </div>
           <div class="field"><label>Taille entreprise min.</label>
             <select id="opt-taille">
               <option value="">Toutes tailles</option>
@@ -284,6 +289,18 @@ document.querySelectorAll('.chip').forEach(function(c){
   c.onclick=function(){this.classList.toggle('on');};
 });
 
+function updateModeLabel(){
+  var soc=document.getElementById('opt-societe').value.trim();
+  var hint=document.getElementById('societe-hint');
+  if(soc){
+    hint.style.color='var(--amber)';
+    hint.textContent='Mode cible : tous les decideurs IT de "'+soc+'" seront recherches';
+  } else {
+    hint.style.color='var(--muted)';
+    hint.textContent='Laissez vide pour chercher sur tous les secteurs coches';
+  }
+}
+
 function getChips(id){
   return Array.from(document.querySelectorAll('#'+id+' .chip.on')).map(function(c){return c.dataset.val;});
 }
@@ -355,36 +372,32 @@ function startGeneration(){
 
   var excludeList=exclude?ALREADY_SEEN.slice(-30):[];
 
-  var prompt='Tu es un agent de prospection B2B expert pour TL Consulting, ESN IT française basée à Bezons (95).'
-    +' Tu dois générer une liste de '+nb+' prospects qualifiés et RÉALISTES pour l\'Île-de-France.'
-    +'\n\nCritères ICP :\n'
-    +'- Profils recherchés : '+profils.join(', ')+'\n'
-    +'- Secteurs : '+secteurs.join(', ')+'\n'
-    +(taille?'- Taille entreprise : '+taille+' et plus\n':'')
-    +'- Localisation : Île-de-France (Paris, Hauts-de-Seine, Seine-Saint-Denis, Val-de-Marne, etc.)\n'
-    +(excludeList.length?'- Exclure ces noms déjà contactés : '+excludeList.join(', ')+'\n':'')
-    +'\nTL Consulting : références BNP Paribas, Natixis, BPCE, Crédit Logement, Meritis, Groupe HSBC, Casden.'
-    +' Arguments différenciants : DORA/NIS2, DSI de transition, cybersécurité, cloud, développement applicatif.'
-    +'\n\nGénère '+nb+' prospects FICTIFS mais RÉALISTES (noms plausibles, entreprises réelles, postes cohérents).'
-    +' Pour chaque prospect, génère aussi :'
-    +' 1) un EMAIL de prospection complet (objet + corps 250-300 mots, signé Thomas LECOUP | DG TL Consulting | 06 19 51 08 02)'
-    +' 2) un MESSAGE LINKEDIN court (< 280 caractères, percutant, prénom direct)'
-    +'\n\nRéponds UNIQUEMENT avec un tableau JSON valide (sans markdown, sans backticks) :'
-    +'\n[{'
-    +'\n  "prenom": "...", "nom": "...", "poste": "...", "entreprise": "...", "secteur": "...", "taille": "...",'
-    +'\n  "email_pro": "...", "linkedin": "linkedin.com/in/...", "ville": "... (75/92/93/94/77/78/91/95)",'
-    +'\n  "contexte": "2-3 phrases enjeux IT actuels de cette entreprise",'
-    +'\n  "score": 0-100,'
-    +'\n  "score_raison": "explication courte du score",'
-    +'\n  "tags": ["tag1","tag2"],'
-    +'\n  "email_gen": "Objet : ...\\n\\n---\\n\\nBonjour ..., \\n\\n[corps complet signé]",'
-    +'\n  "linkedin_gen": "message LinkedIn < 280 chars"'
-    +'\n}, ...]'
-    +'\n\nRègles :'
-    +'\n- score basé sur : secteur prioritaire (+25), taille (+25), niveau décisionnaire (+25), email dispo (+15), linkedin (+10)'
-    +'\n- tags exemples : "DORA/NIS2", "Cible prioritaire", "DSI senior", "Fort potentiel ICP", "Data expert", "Cloud", "Cybersécurité"'
-    +'\n- email_gen : personnalisé avec le contexte de l\'entreprise, accroche sur un enjeu réel (DORA, transformation, cloud...)'
-    +'\n- linkedin_gen : commence par le prénom, max 280 chars, CTA clair';
+  var societe=document.getElementById('opt-societe')?document.getElementById('opt-societe').value.trim():'';
+
+  var prompt='Génère '+nb+' prospects IT fictifs en Ile-de-France pour TL Consulting ESN IT.'
+    +(societe?' Concentre-toi UNIQUEMENT sur la société: '+societe+'.':'')
+    +'\nProfils: '+profils.join(', ')+'\nSecteurs: '+secteurs.join(', ')
+    +(taille&&!societe?'\nTaille min: '+taille:'')
+    +'\nRègle: JSON STRICT, zéro apostrophe dans valeurs, zéro markdown.'
+    +'\nFormat: [{"prenom":"Jean","nom":"DUPONT","poste":"DSI","entreprise":"BNP Paribas","secteur":"Banque Finance","taille":"Grand groupe","email_pro":"j.dupont@bnp.fr","linkedin":"linkedin.com/in/jean-dupont","ville":"Paris 75","contexte":"Cloud AWS DORA 2025","score":85,"score_raison":"Grand groupe finance","tags":["DORA"]}]'
+    +'\nReponds UNIQUEMENT avec le tableau JSON.';
+
+  var STEP_LABELS = societe ? [
+    'Analyse de la societe '+societe,
+    'Recherche des decideurs IT internes',
+    'Identification des contacts cles',
+    'Verification anti-doublons',
+    'Generation des messages personnalises',
+    'Injection dans le pipeline'
+  ] : [
+    'Analyse de votre ICP TL Consulting',
+    'Recherche de profils en Ile-de-France',
+    'Qualification et scoring ICP',
+    'Verification anti-doublons',
+    'Generation des messages personnalises',
+    'Injection dans le pipeline'
+  ];
+  STEPS = STEPS.map(function(s,i){ return {id:s.id, label:STEP_LABELS[i]}; });
 
   setTimeout(function(){setProgress(1);},600);
   setTimeout(function(){setProgress(2);},1400);
@@ -400,7 +413,7 @@ function startGeneration(){
     },
     body:JSON.stringify({
       model:'claude-sonnet-4-6',
-      max_tokens:8000,
+      max_tokens:4000,
       messages:[{role:'user',content:prompt}]
     })
   })
@@ -408,31 +421,50 @@ function startGeneration(){
   .then(function(data){
     setProgress(4);
     var txt=(data.content&&data.content[0]&&data.content[0].text)||'[]';
-    // Nettoyer agressivement
-    txt=txt.replace(/```json/g,'').replace(/```/g,'').trim();
-    // Chercher le premier [ et le dernier ]
-    var start=txt.indexOf('[');
-    var end=txt.lastIndexOf(']');
-    if(start===-1||end===-1||end<=start) throw new Error('Aucun tableau JSON trouvé dans la réponse');
-    var jsonStr=txt.slice(start,end+1);
-    var list=JSON.parse(jsonStr);
-
+    txt=txt.replace(/```json/gi,'').replace(/```/g,'').trim();
+    var s=txt.indexOf('['),e=txt.lastIndexOf(']');
+    if(s<0||e<=s) throw new Error('JSON introuvable: '+txt.slice(0,80));
+    var list=JSON.parse(txt.slice(s,e+1));
     setProgress(5);
-    setTimeout(function(){
-      setProgress(6);
-      setTimeout(function(){
-        PROSPECTS=list;
-        list.forEach(function(p){if(p.nom) ALREADY_SEEN.push(p.prenom+' '+p.nom);});
-        saveState();
-        document.getElementById('last-gen').textContent=new Date().toLocaleDateString('fr-FR')+' à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-        renderResults(list);
-        updateStats(list);
-        document.getElementById('progress-wrap').style.display='none';
-        document.getElementById('btn-gen').disabled=false;
-        document.getElementById('btn-gen').innerHTML='⚡ Regénérer';
-        toast(list.length+' prospects générés et prêts ✓');
-      },600);
-    },800);
+
+    // 2e appel : messages en texte libre avec délimiteurs (évite les problèmes JSON)
+    var p2='Pour chaque prospect, écris un email et un message LinkedIn.'
+      +'\nUtilise EXACTEMENT ce format avec délimiteurs (N = numéro 0 à '+(list.length-1)+'):\n'
+      +'===EMAIL_0===\nObjet: [titre]\n\n[corps 150 mots signé Thomas LECOUP DG TL Consulting 06 19 51 08 02]\n===LI_0===\n[LinkedIn max 200 chars]\n\n===EMAIL_1===\n...\n'
+      +'\nProspects:\n'+list.map(function(p,i){return i+'. '+p.prenom+' '+p.nom+' - '+p.poste+' chez '+p.entreprise+' ('+p.secteur+') - '+p.contexte;}).join('\n');
+
+    return fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:8000,messages:[{role:'user',content:p2}]})
+    }).then(function(r){return r.json();}).then(function(md){
+      var mt=(md.content&&md.content[0]&&md.content[0].text)||'';
+      list.forEach(function(p,i){
+        var em=mt.match(new RegExp('===EMAIL_'+i+'===\\n([\\s\\S]*?)(?:===LI_'+i+'===|===EMAIL_'+(i+1)+'===|$)'));
+        var li=mt.match(new RegExp('===LI_'+i+'===\\n([\\s\\S]*?)(?:===EMAIL_'+(i+1)+'===|===LI_'+(i+1)+'===|$)'));
+        if(em) p.email_gen=em[1].trim();
+        if(li) p.linkedin_gen=li[1].trim().slice(0,280);
+      });
+      return list;
+    });
+  })
+  .then(function(list){
+    PROSPECTS=list;
+    list.forEach(function(p){if(p.nom) ALREADY_SEEN.push(p.prenom+' '+p.nom);});
+    saveState();
+    setProgress(6);
+    document.getElementById('last-gen').textContent=new Date().toLocaleDateString('fr-FR')+' à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    renderResults(list);
+    updateStats(list);
+    document.getElementById('progress-wrap').style.display='none';
+    document.getElementById('btn-gen').disabled=false;
+    document.getElementById('btn-gen').innerHTML='⚡ Regénérer';
+    toast(list.length+' prospects générés et prêts ✓');
   })
   .catch(function(e){
     document.getElementById('progress-wrap').style.display='none';
