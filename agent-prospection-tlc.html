@@ -377,6 +377,10 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
       <div class="section-title">Données de démonstration</div>
       <button class="btn btn-secondary btn-full" onclick="loadDemoData()">🎯 Charger 8 prospects démo</button>
     </div>
+    <div style="margin-top:14px">
+      <div class="section-title">Maintenance</div>
+      <button class="btn btn-full" onclick="purgeDoublons()" style="background:rgba(231,76,60,0.08);color:var(--red);border:1px solid rgba(231,76,60,0.2);justify-content:center">🧹 Supprimer les doublons</button>
+    </div>
   </div>
 
   <!-- TAB PIPELINE -->
@@ -448,24 +452,43 @@ function initStorage(){
   }catch(e){}
 }
 
+function dedupKey(p){ return ((p.prenom||'')+(p.nom||'')+(p.entreprise||'')).toLowerCase().replace(/\s/g,''); }
+
+function fixSignatures(list){
+  // Corriger les anciennes signatures "Directeur Général" en "Gérant"
+  list.forEach(function(p){
+    if(p.email_gen) p.email_gen=p.email_gen.replace(/Directeur G[eé]n[eé]ral\s*[–-]\s*TL Consulting/gi,'Gérant TL Consulting').replace(/DG TL Consulting/gi,'Gérant TL Consulting');
+    if(p.linkedin_gen) p.linkedin_gen=p.linkedin_gen.replace(/DG TL Consulting/gi,'Gérant TL Consulting');
+  });
+  return list;
+}
+
+function dedup(list){
+  var seen={};
+  return list.filter(function(p){
+    var k=dedupKey(p);
+    if(seen[k]) return false;
+    seen[k]=true;
+    return true;
+  });
+}
+
 function save(){
   var data = JSON.stringify(prospects);
-  // 1. Toujours sauvegarder en local
   try{localStorage.setItem('tlc_prospects', data);}catch(e){}
-  // 2. Si cloud configuré, sauvegarder sur GitHub Gist
-  if(GIST_ID && GIST_TOKEN){
-    saveToGist(data);
-  }
+  if(GIST_ID && GIST_TOKEN){ saveToGist(data); }
   updateCloudStatus();
 }
 
 function load(){
-  // Charger depuis localStorage d'abord
-  try{var s=localStorage.getItem('tlc_prospects');if(s)prospects=JSON.parse(s);}catch(e){}
-  // Si cloud configuré, essayer de charger depuis Gist (plus récent)
-  if(GIST_ID && GIST_TOKEN){
-    loadFromGist();
-  }
+  try{
+    var s=localStorage.getItem('tlc_prospects');
+    if(s){
+      var loaded=JSON.parse(s);
+      prospects=dedup(fixSignatures(loaded));
+    }
+  }catch(e){}
+  if(GIST_ID && GIST_TOKEN){ loadFromGist(); }
 }
 
 function saveToGist(data){
@@ -1129,6 +1152,10 @@ function parseCSV(file){
         date_ajout:new Date().toLocaleDateString('fr-FR')
       };
       p.score=calcScore(p);
+      // Vérifier doublon
+      var key=dedupKey(p);
+      var isDup=prospects.some(function(ex){ return dedupKey(ex)===key; });
+      if(isDup){ added--; continue; }
       prospects.unshift(p);
       added++;
     }
@@ -1172,7 +1199,17 @@ function loadDemoData(){
   toast('8 prospects de démo chargés ✓');
 }
 
-/* ===== TOAST ===== */
+/* ===== PURGE DOUBLONS ===== */
+function purgeDoublons(){
+  var avant=prospects.length;
+  prospects=dedup(fixSignatures(prospects));
+  var apres=prospects.length;
+  var suppr=avant-apres;
+  save(); updateStats(); renderList();
+  activeId=null;
+  document.getElementById('main-content').innerHTML='<div class="empty-state"><div class="empty-icon">🧹</div><div class="empty-txt">'+(suppr>0?suppr+' doublon'+(suppr>1?'s':'')+' supprimé'+(suppr>1?'s':''):'Aucun doublon trouvé')+'</div><div class="empty-sub">'+apres+' prospects uniques restants</div></div>';
+  toast(suppr>0?suppr+' doublon(s) supprimé(s) ✓':'Aucun doublon trouvé');
+}
 function toast(msg,type){
   var el=document.getElementById('toast');
   el.textContent=msg;
