@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agent Prospection IA — TL Consulting v2</title>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1206,81 +1206,20 @@ function loadDemoData(){
   toast('8 prospects de démo chargés ✓');
 }
 
-/* ===== OUTLOOK BROUILLON (Microsoft Graph MSAL) ===== */
-var MSAL_CLIENT_ID = '62a5371c-86ec-44f6-8d64-4bba6c61bb49';
-var MSAL_TENANT_ID = 'c7a3beae-807c-479a-8091-026ddee531d9';
-var MSAL_SCOPES    = ['Mail.ReadWrite'];
-var MSAL_REDIRECT  = 'https://tlexecutive.github.io/agent-prospection';
-var outlookToken   = null;
-
-async function sendDraftOutlook(pid){
+/* ===== OUTLOOK BROUILLON (mailto) ===== */ (Microsoft Graph MSAL) ===== */
+function sendDraftOutlook(pid){
   var p=prospects.find(function(x){return x.id===pid;});
-  if(!p){toast('Prospect introuvable','error');return;}
-  var emailTxt=p.email_gen||'';
-  if(!emailTxt){toast('Générez d\'abord l\'email avec IA','error');return;}
-  if(!p.email){toast('Adresse email du prospect manquante','error');return;}
-
+  if(!p||!p.email_gen){toast('Generez l email IA d abord','error');return;}
+  if(!p.email){toast('Email prospect manquant','error');return;}
+  var lines=p.email_gen.split('\n'),subject='',body=[],ok=false;
+  for(var i=0;i<lines.length;i++){if(!ok&&/^objet\s*:/i.test(lines[i])){subject=lines[i].replace(/^objet\s*:\s*/i,'').trim();ok=true;}else if(ok)body.push(lines[i]);}
+  if(!subject)subject='TL Consulting - '+p.poste+' chez '+p.entreprise;
+  window.open('mailto:'+encodeURIComponent(p.email)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body.join('\n').trim()));
+  p.statut='sent';save();renderList();
   var btn=document.getElementById('btn-draft');
-  if(btn){btn.disabled=true;btn.textContent='⏳ Connexion...';}
-
-  try{
-    if(typeof msal==='undefined') throw new Error('MSAL non chargé — rechargez la page');
-
-    var msalApp=new msal.PublicClientApplication({
-      auth:{clientId:MSAL_CLIENT_ID,authority:'https://login.microsoftonline.com/'+MSAL_TENANT_ID,redirectUri:MSAL_REDIRECT},
-      cache:{cacheLocation:'localStorage',storeAuthStateInCookie:false}
-    });
-    await msalApp.initialize();
-    try{await msalApp.handleRedirectPromise();}catch(e){}
-
-    if(!outlookToken){
-      var accounts=msalApp.getAllAccounts();
-      if(accounts.length>0){
-        try{var r1=await msalApp.acquireTokenSilent({scopes:MSAL_SCOPES,account:accounts[0]});outlookToken=r1.accessToken;}catch(e){}
-      }
-      if(!outlookToken){
-        if(btn) btn.textContent='⏳ Connexion Microsoft...';
-        var r2=await msalApp.acquireTokenPopup({scopes:MSAL_SCOPES});
-        outlookToken=r2.accessToken;
-      }
-    }
-
-    if(btn) btn.textContent='⏳ Création brouillon...';
-
-    // Extraire objet et corps
-    var lines=emailTxt.split('\n'),subject='',bodyLines=[],past=false;
-    for(var i=0;i<lines.length;i++){
-      if(!past&&/^objet\s*:/i.test(lines[i])){subject=lines[i].replace(/^objet\s*:\s*/i,'').trim();past=true;}
-      else if(past) bodyLines.push(lines[i]);
-    }
-    if(!subject) subject='TL Consulting — '+p.poste+' chez '+p.entreprise;
-    var body=bodyLines.join('\n').trim()||emailTxt;
-
-    var resp=await fetch('https://graph.microsoft.com/v1.0/me/messages',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+outlookToken,'Content-Type':'application/json'},
-      body:JSON.stringify({
-        subject:subject,isDraft:true,
-        body:{contentType:'Text',content:body},
-        toRecipients:[{emailAddress:{address:p.email,name:p.prenom+' '+p.nom}}]
-      })
-    });
-    if(!resp.ok){
-      if(resp.status===401){outlookToken=null;}
-      var err=await resp.json();
-      throw new Error(err.error&&err.error.message||'Erreur Graph '+resp.status);
-    }
-
-    p.statut='sent'; save(); renderList();
-    if(btn){btn.disabled=false;btn.textContent='✅ Brouillon créé';btn.style.background='rgba(46,204,113,0.12)';btn.style.color='#2ECC71';btn.style.borderColor='rgba(46,204,113,0.3)';}
-    toast('📨 Brouillon créé dans Outlook pour '+p.prenom+' '+p.nom+' ✓');
-
-  }catch(e){
-    if(btn){btn.disabled=false;btn.textContent='📨 Brouillon';}
-    toast('Erreur : '+e.message,'error');
-  }
+  if(btn){btn.textContent='OK Outlook ouvert';btn.style.background='rgba(46,204,113,0.12)';btn.style.color='#2ECC71';}
+  toast('Outlook ouvert avec l email pret');
 }
-
 /* ===== PURGE DOUBLONS ===== */
 function purgeDoublons(){
   var avant=prospects.length;
