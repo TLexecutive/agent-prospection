@@ -196,6 +196,30 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
 <body>
 
 <!-- HEADER -->
+<!-- MODALE CLOUD SETUP -->
+<div id="cloud-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:3000;align-items:center;justify-content:center">
+  <div style="background:#132226;border:1px solid rgba(42,157,143,0.35);border-radius:12px;padding:26px;width:480px;max-width:95vw">
+    <div style="font-size:15px;font-weight:700;color:var(--teal);margin-bottom:6px">☁ Sauvegarde Cloud</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:18px;line-height:1.6">Vos prospects seront sauvegardés sur un <strong style="color:var(--teal)">GitHub Gist privé</strong> et accessibles depuis n'importe quel appareil. Il suffit d'un <strong style="color:var(--teal)">Personal Access Token</strong> GitHub.</div>
+    <div style="background:#1A3035;border-radius:8px;padding:14px;margin-bottom:14px;font-size:11px;color:var(--muted);line-height:1.7">
+      <strong style="color:var(--txt)">Comment créer un token :</strong><br>
+      1. Allez sur <a href="https://github.com/settings/tokens/new" target="_blank" style="color:var(--teal)">github.com/settings/tokens/new</a><br>
+      2. Nom : <code style="background:#0D1F22;padding:1px 5px;border-radius:3px">tlc-prospects</code><br>
+      3. Cochez uniquement <strong style="color:var(--teal)">gist</strong><br>
+      4. Cliquez <strong>Generate token</strong> et copiez
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px;font-weight:700">Token GitHub (ghp_... ou github_pat_...)</label>
+      <input id="cloud-token-input" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="width:100%;background:#1A3035;border:1px solid rgba(42,157,143,0.25);border-radius:6px;color:var(--txt);font-size:12px;padding:8px 11px;font-family:inherit;outline:none">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button onclick="disableCloud()" style="background:rgba(231,76,60,0.1);color:#E74C3C;border:1px solid rgba(231,76,60,0.25);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit">Désactiver</button>
+      <button onclick="closeCloudSetup()" style="background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.1);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit">Annuler</button>
+      <button id="cloud-setup-btn" onclick="setupCloud()" style="background:var(--teal);color:#0D1F22;border:none;padding:7px 18px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit">Activer la sauvegarde cloud</button>
+    </div>
+  </div>
+</div>
+
 <div class="header">
   <div class="logo-zone">
     <div class="logo">TL</div>
@@ -208,6 +232,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color:
     <div class="hstat"><div class="hstat-val" id="stat-total">0</div><div class="hstat-lbl">Prospects</div></div>
     <div class="hstat"><div class="hstat-val" id="stat-sent" style="color:var(--green)">0</div><div class="hstat-lbl">Envoyés</div></div>
     <div class="hstat"><div class="hstat-val" id="stat-hot" style="color:var(--amber)">0</div><div class="hstat-lbl">Chauds</div></div>
+    <button id="cloud-badge" onclick="openCloudSetup()" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(244,162,97,0.25);background:rgba(244,162,97,0.1);color:var(--amber);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s">💾 Local seulement</button>
   </div>
 </div>
 
@@ -411,8 +436,152 @@ function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 function initials(p){ return ((p.prenom||'?')[0]+(p.nom||'?')[0]).toUpperCase(); }
 function avColor(p){ var h=0;for(var i=0;i<p.nom.length;i++)h+=p.nom.charCodeAt(i);return COLORS[h%COLORS.length]; }
 
-function save(){ try{localStorage.setItem('tlc_prospects',JSON.stringify(prospects));}catch(e){} }
-function load(){ try{var s=localStorage.getItem('tlc_prospects');if(s)prospects=JSON.parse(s);}catch(e){} }
+/* ===== PERSISTANCE CLOUD (GitHub Gist) + localStorage ===== */
+var GIST_ID = null;
+var GIST_TOKEN = null;
+
+function initStorage(){
+  // Charger config cloud depuis localStorage
+  try{
+    GIST_ID = localStorage.getItem('tlc_gist_id') || null;
+    GIST_TOKEN = localStorage.getItem('tlc_gist_token') || null;
+  }catch(e){}
+}
+
+function save(){
+  var data = JSON.stringify(prospects);
+  // 1. Toujours sauvegarder en local
+  try{localStorage.setItem('tlc_prospects', data);}catch(e){}
+  // 2. Si cloud configuré, sauvegarder sur GitHub Gist
+  if(GIST_ID && GIST_TOKEN){
+    saveToGist(data);
+  }
+  updateCloudStatus();
+}
+
+function load(){
+  // Charger depuis localStorage d'abord
+  try{var s=localStorage.getItem('tlc_prospects');if(s)prospects=JSON.parse(s);}catch(e){}
+  // Si cloud configuré, essayer de charger depuis Gist (plus récent)
+  if(GIST_ID && GIST_TOKEN){
+    loadFromGist();
+  }
+}
+
+function saveToGist(data){
+  fetch('https://api.github.com/gists/'+GIST_ID,{
+    method:'PATCH',
+    headers:{'Authorization':'token '+GIST_TOKEN,'Content-Type':'application/json'},
+    body:JSON.stringify({files:{'tlc-prospects.json':{content:data}}})
+  }).catch(function(){});
+}
+
+function loadFromGist(){
+  fetch('https://api.github.com/gists/'+GIST_ID,{
+    headers:{'Authorization':'token '+GIST_TOKEN}
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var content=d.files&&d.files['tlc-prospects.json']&&d.files['tlc-prospects.json'].content;
+    if(!content) return;
+    var remote=JSON.parse(content);
+    // Fusionner : garder le plus récent par prospect
+    var localMap={};
+    prospects.forEach(function(p){localMap[p.id]=p;});
+    remote.forEach(function(p){
+      if(!localMap[p.id]) prospects.push(p);
+    });
+    try{localStorage.setItem('tlc_prospects',JSON.stringify(prospects));}catch(e){}
+    updateStats(); renderList();
+    if(prospects.length>0 && !activeId) selectProspect(prospects[0].id);
+    showCloudBadge('✓ Synchronisé depuis le cloud','ok');
+  })
+  .catch(function(){});
+}
+
+function createGist(token){
+  return fetch('https://api.github.com/gists',{
+    method:'POST',
+    headers:{'Authorization':'token '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({
+      description:'TL Consulting — Prospects Pipeline',
+      public:false,
+      files:{'tlc-prospects.json':{content:JSON.stringify(prospects)}}
+    })
+  }).then(function(r){return r.json();});
+}
+
+function updateCloudStatus(){
+  var badge=document.getElementById('cloud-badge');
+  if(!badge) return;
+  if(GIST_ID&&GIST_TOKEN){
+    badge.style.background='rgba(46,204,113,0.12)';
+    badge.style.color='#2ECC71';
+    badge.style.borderColor='rgba(46,204,113,0.3)';
+    badge.textContent='☁ Cloud actif';
+  } else {
+    badge.style.background='rgba(244,162,97,0.1)';
+    badge.style.color='var(--amber)';
+    badge.style.borderColor='rgba(244,162,97,0.25)';
+    badge.textContent='💾 Local seulement';
+  }
+}
+
+function showCloudBadge(msg,type){
+  var badge=document.getElementById('cloud-badge');
+  if(!badge) return;
+  var old=badge.textContent;
+  badge.textContent=msg;
+  setTimeout(function(){badge.textContent=GIST_ID?'☁ Cloud actif':'💾 Local seulement';},2500);
+}
+
+function openCloudSetup(){
+  var overlay=document.getElementById('cloud-overlay');
+  if(overlay) overlay.style.display='flex';
+}
+function closeCloudSetup(){
+  var overlay=document.getElementById('cloud-overlay');
+  if(overlay) overlay.style.display='none';
+}
+
+async function setupCloud(){
+  var token=document.getElementById('cloud-token-input').value.trim();
+  if(!token||!token.startsWith('ghp_')&&!token.startsWith('github_pat_')){
+    toast('Token GitHub invalide (doit commencer par ghp_ ou github_pat_)','error');return;
+  }
+  var btn=document.getElementById('cloud-setup-btn');
+  btn.textContent='Connexion...';btn.disabled=true;
+  try{
+    var existingGistId=localStorage.getItem('tlc_gist_id');
+    if(existingGistId){
+      GIST_ID=existingGistId;GIST_TOKEN=token;
+    } else {
+      var gist=await createGist(token);
+      if(!gist.id) throw new Error('Création Gist échouée');
+      GIST_ID=gist.id;GIST_TOKEN=token;
+      localStorage.setItem('tlc_gist_id',GIST_ID);
+    }
+    localStorage.setItem('tlc_gist_token',token);
+    save();
+    closeCloudSetup();
+    updateCloudStatus();
+    toast('☁ Sauvegarde cloud activée ✓');
+  }catch(e){
+    toast('Erreur : '+e.message,'error');
+  }
+  btn.textContent='Activer la sauvegarde cloud';btn.disabled=false;
+}
+
+function disableCloud(){
+  GIST_ID=null;GIST_TOKEN=null;
+  localStorage.removeItem('tlc_gist_id');
+  localStorage.removeItem('tlc_gist_token');
+  updateCloudStatus();
+  closeCloudSetup();
+  toast('Sauvegarde cloud désactivée');
+}
+
+initStorage();
 load();
 
 /* ===== IMPORT DEPUIS LINKEDIN (Chrome) ===== */
@@ -1017,6 +1186,7 @@ function toast(msg,type){
 updateStats();
 renderList();
 if(prospects.length>0) selectProspect(prospects[0].id);
+updateCloudStatus();
 </script>
 </body>
 </html>
