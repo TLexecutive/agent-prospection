@@ -408,10 +408,14 @@ function startGeneration(){
   .then(function(data){
     setProgress(4);
     var txt=(data.content&&data.content[0]&&data.content[0].text)||'[]';
-    txt=txt.replace(/```json|```/g,'').trim();
-    var match=txt.match(/\[[\s\S]*\]/);
-    if(!match) throw new Error('JSON invalide');
-    var list=JSON.parse(match[0]);
+    // Nettoyer agressivement
+    txt=txt.replace(/```json/g,'').replace(/```/g,'').trim();
+    // Chercher le premier [ et le dernier ]
+    var start=txt.indexOf('[');
+    var end=txt.lastIndexOf(']');
+    if(start===-1||end===-1||end<=start) throw new Error('Aucun tableau JSON trouvé dans la réponse');
+    var jsonStr=txt.slice(start,end+1);
+    var list=JSON.parse(jsonStr);
 
     setProgress(5);
     setTimeout(function(){
